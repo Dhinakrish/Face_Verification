@@ -6,9 +6,9 @@ export const handleNetwork = ({navigation}) => {
     
     return (dispatch, getState) => {
         dispatch(showSpinner());
-        if (!getState().deviceState.isNetworkConnectivityAvailable){
+        if (!getState().deviceState.isNetworkConnectivityAvailable || getState().deviceState.isNetworkConnectivityAvailable == undefined){
             dispatch(hideSpinner());
-            navigation.navigate('networkscreen')
+            navigation.navigate('networkscreen');
         }
         else{
             dispatch(hideSpinner());

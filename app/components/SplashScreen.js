@@ -30,7 +30,7 @@ const SplashScreen = ({navigation}) => {
             source={require('../assets/istockphoto-1076841360-612x612.jpg')}
             style = {styleProps.imageStyle}
             />
-            {true && <ActivityIndicator 
+            {!isJailBroked && <ActivityIndicator 
             animating={isLoading} 
             color="lightgrey"
             size={wp('10%')}

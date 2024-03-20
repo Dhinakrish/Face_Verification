@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {View, Text, PermissionsAndroid, StyleSheet, Image, BackHandler, Alert, Platform, Linking, TouchableOpacity} from 'react-native';
+import {View, Text, PermissionsAndroid, StyleSheet, Image, BackHandler, Alert, Platform, Linking, TouchableOpacity, ImageBackgroundBase, ImageBackground} from 'react-native';
 import { Appbar, Modal, Button, ActivityIndicator } from "react-native-paper";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { Camera, useCameraDevice, useCodeScanner } from "react-native-vision-camera";
@@ -8,8 +8,10 @@ import IntentLauncher from '@suxueweibo/react-native-intent-launcher';
 import BarcodeMask from "react-native-barcode-mask";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDispatch, useSelector } from "react-redux";
-import { hideQRLoading, showQRLoading } from "../redux/actions/QRScreenAction";
+import { hideQRLoading, showQRLoading, updatePermissionStatus, updateQRValue } from "../redux/actions/QRScreenAction";
 import { QRLoading } from "../redux/reducers/QRScreenReducer";
+import Constants from '../util/Constants';
+import { permissionGranted } from "../redux/reducers/DeviceReducer";
 
 const QRScreen = ({navigation}) => {
 
@@ -20,6 +22,9 @@ const QRScreen = ({navigation}) => {
     const [gotCameraPermission, setGotCameraPermission] = useState(false);
     const dispatch = useDispatch();
     const QrLoading = useSelector(QRLoading);
+    const PermissionGranted = useSelector(permissionGranted);
+
+    const {COLOR, FONT} = Constants;
 
     useEffect(() => {
         checkCameraPermission();
@@ -32,19 +37,28 @@ const QRScreen = ({navigation}) => {
 
         if (result === PermissionsAndroid.RESULTS.GRANTED){
             setGotCameraPermission(true);
+            dispatch(updatePermissionStatus(true));
         }
         else{
+            dispatch(updatePermissionStatus(false));
             setGotCameraPermission(false);
             checkCameraPermission();
         }
     };
 
-    const device = useCameraDevice('back');
+    const device = useCameraDevice('back', {
+        physicalDevices: [
+            'wide-angle-camera',
+        ],
+    });
 
     const codeScanner = useCodeScanner({
         codeTypes: ['qr', 'ean-13'],
         onCodeScanned: (code) => {
             console.log('QR_Code', code);
+            code.map(item => {
+                dispatch(updateQRValue(item.value));
+            })
             setIsCameraActivate(false);
             setShowModel(true);
         }
@@ -86,11 +100,11 @@ const QRScreen = ({navigation}) => {
                 dismissable = {true}
                 >  
                     <Image source={require('../assets/checked.png')} style = {{width: wp('15%'), height: wp('15%'), marginTop: hp('2%')}}/>
-                    <Text style= {{fontSize: wp('5%'), color: 'black', marginTop: wp('3%')}}>QR Code verified</Text>
-                    <Text style= {{fontSize: wp('5%'), color: 'black', marginTop: wp('1%')}}>Successfully</Text>
+                    <Text style= {{fontSize: FONT.M, color: COLOR.BLACK, marginTop: wp('3%')}}>QR Code verified</Text>
+                    <Text style= {{fontSize: FONT.M, color: COLOR.BLACK, marginTop: wp('1%')}}>Successfully</Text>
                     <Button
                     mode="contained-tonal"
-                    style = {{marginTop: hp('3%'), backgroundColor: 'lightblue'}}
+                    style = {{marginTop: hp('3%'), backgroundColor: COLOR.PRIMARY}}
                     onPress={() => {
                         setShowModel(false);
                         setIsCameraActivate(false);
@@ -113,11 +127,11 @@ const QRScreen = ({navigation}) => {
                 dismissable = {true}
                 >  
                     <Image source={require('../assets/inventory.png')} style = {{width: wp('15%'), height: wp('15%'), marginTop: hp('2%')}}/>
-                    <Text style= {{fontSize: wp('4%'), color: 'black', marginTop: wp('3%')}}>Need Camera Permission</Text>
-                    <Text style= {{fontSize: wp('4%'), color: 'black', marginTop: wp('1%')}}>to access the camera</Text>
+                    <Text style= {{fontSize: FONT.M, color: COLOR.BLACK, marginTop: wp('3%')}}>Need Camera Permission</Text>
+                    <Text style= {{fontSize: FONT.M, color: COLOR.BLACK, marginTop: wp('1%')}}>to access the camera</Text>
                     <Button
                     mode="contained-tonal"
-                    style = {{marginTop: hp('3%'), backgroundColor: 'lightblue'}}
+                    style = {{marginTop: hp('3%'), backgroundColor: COLOR.PRIMARY}}
                     onPress={() => {
                         if (Platform.OS === 'ios'){
                             Linking.openURL('app-settings:');
@@ -144,6 +158,9 @@ const QRScreen = ({navigation}) => {
                 style = {{width: wp ('70%'), height: wp ('70%')}}
                 codeScanner={codeScanner}
                 isActive={isCameraActivate ? true : false}
+                focusable = {true}
+                resizeMode="cover"
+                zoom={device.neutralZoom}
                 />
                 <BarcodeMask
                 width={wp('70%')}
@@ -159,12 +176,18 @@ const QRScreen = ({navigation}) => {
     }
 
     return(
-        <View style = {styleProps.mainContainer}>
-            <Appbar.Header style  = {styleProps.appBar}>
-                <Appbar.Content  titleStyle= {{fontWeight: '600'}} title = 'QR Screen'/>
+        <View style = {{width: wp('100%'), height: hp('100%'), alignItems: 'center', backgroundColor: 'lightgrey'}}>
+            <ImageBackground
+            source={require('../assets/login-bg.png')}
+            style={{width: wp('100%'), height: hp('100%'), alignItems: 'center'}}
+            >
+                <Appbar.Header style  = {{width: wp('100%'), height: hp('7%'), backgroundColor: COLOR.PRIMARY}}>
+                <Appbar.Content  titleStyle= {{fontWeight: '700', fontSize: FONT.L}} title = 'QR Screen'/>
             </Appbar.Header>
-            <View style = {styleProps.qrMsgContainer}>
-                <Text style = {styleProps.qrTextStyle}>Scan QR Code</Text>
+            <View style = {{width: wp ('100%'), height: hp('5%'), marginTop: hp ('10%'), justifyContent: 'center', alignItems: 'center'}}>
+                <Text style = {{fontSize: FONT.L, fontWeight: '400', color: COLOR.BLACK}}>
+                    Scan QR Code
+                </Text>
             </View>
             <View style = {styleProps.qrContainer}>
                 {QrLoading && <ActivityIndicator
@@ -172,51 +195,31 @@ const QRScreen = ({navigation}) => {
                 color="lightgrey"
                 size={wp('10%')}
                 />}
-                {!isCameraActivate && <TouchableOpacity style = {styleProps.tabBtn}
+                {!isCameraActivate && <TouchableOpacity style = {{width: wp ('40%'), height: hp('6%'), backgroundColor: COLOR.PRIMARY, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}
                 onPress={() => {
                     dispatch(showQRLoading());
-                    if (gotCameraPermission === false){
+                    if (PermissionGranted === false){
                         renderPermissionModel();
                     }else{
                         setIsCameraActivate(true);
                     }
                 }}
                 >
-                    <Text style = {{fontSize: wp('4%'), fontWeight: '500', color: 'black'}}>Tap to scan</Text>
+                    <Text style = {{fontSize: FONT.M, fontWeight: '500', color: COLOR.BLACK}}>Tap to scan</Text>
                 </TouchableOpacity>}
                 {isCameraActivate && renderQRView()}
-                {!gotCameraPermission && renderPermissionModel()}
+                {!PermissionGranted && renderPermissionModel()}
                 {showModel && renderModal()}
             </View>
+            </ImageBackground>
         </View>
     )
 }
 
 const styleProps = StyleSheet.create({
-    mainContainer: {
-        width: wp('100%'),
-        height: hp('100%'),
-        alignItems: 'center',
-        backgroundColor: 'lightgrey'
-    },
-
-    qrMsgContainer: {
-      width: wp ('100%'),
-      height: hp('5%'),
-      marginTop: hp ('10%'),
-      justifyContent: 'center',
-      alignItems: 'center'
-    },
-
-    qrTextStyle: {
-        fontSize: wp ('5%'),
-        fontWeight: '500',
-        color: 'black'
-    },
-
+    
     qrContainer: {
-        width: wp('70%'),
-        height: wp ('70%'),
+        width: wp('70%'), height: wp ('70%'),
         marginTop: hp('5%'), 
         position: "relative",
         backgroundColor: 'white',
@@ -231,19 +234,6 @@ const styleProps = StyleSheet.create({
         alignSelf: 'center'
     },
 
-    appBar: {
-        width: wp('100%'),
-        height: hp('7%'),
-        backgroundColor: 'lightblue'
-    },
-
-    popupRenderContainer: {
-        backgroundColor: 'grey', 
-        width: wp('100%'), 
-        height: hp('100%'), 
-        justifyContent: 'center', 
-        alignSelf: 'center'
-    },
 
     modalContainer: {
         width: wp('60%'), 
@@ -259,15 +249,6 @@ const styleProps = StyleSheet.create({
         shadowOpacity: 10,
         justifyContent: 'flex-start',
     },
-
-    tabBtn: {
-        width: wp ('40%'),
-        height: hp('6%'),
-        backgroundColor: 'lightblue',
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center'
-    }
 })
 
 export default QRScreen;

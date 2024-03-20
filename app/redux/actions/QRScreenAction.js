@@ -15,3 +15,13 @@ export const hideQRLoading = () => {
         })
     }
 };
+
+export const updateQRValue = (qrCodeValue) => ({
+    type: Constants.ACTIONS.UPDATE_QR_VALUE,
+    qrCodeValue
+});
+
+export const updatePermissionStatus = (permissionGranted) => ({
+    type: Constants.ACTIONS.UPDATE_PERMISSION_STATUS,
+    permissionGranted
+});

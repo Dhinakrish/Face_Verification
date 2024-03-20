@@ -7,7 +7,6 @@ import SplashScreen from "./app/components/SplashScreen";
 import QRScreen from "./app/components/QRScreen";
 import NetworkScreen from "./app/components/NetworkActivity";
 import CameraScreen from "./app/components/CameraScreen";
-import PreviewScreen from "./app/components/PreviewScreen";
 
 const App = () => {
 
@@ -17,7 +16,7 @@ const App = () => {
         <Provider store={store}>
         <NavigationContainer>
             <Stack.Navigator 
-            initialRouteName='qrscreen'
+            initialRouteName='splashscreen'
             screenOptions={{
                 headerShown: false,
             }}
@@ -26,7 +25,6 @@ const App = () => {
                 <Stack.Screen name='qrscreen' component={QRScreen}/>
                 <Stack.Screen name="networkscreen" component={NetworkScreen}/>
                 <Stack.Screen name="camerascreen" component={CameraScreen}/>
-                <Stack.Screen name="previewscreen" component={PreviewScreen}/>
             </Stack.Navigator>
         </NavigationContainer>
         </Provider>
