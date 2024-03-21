@@ -5,10 +5,10 @@ import { networkStatus } from "../reducers/DeviceReducer";
 export const handleNetwork = ({navigation}) => {
     
     return (dispatch, getState) => {
-        dispatch(showSpinner());
-        if (!getState().deviceState.isNetworkConnectivityAvailable){
+        navigation.navigate('loginscreen');
+        if (!getState().deviceState.isNetworkConnectivityAvailable || getState().deviceState.isNetworkConnectivityAvailable == undefined){
             dispatch(hideSpinner());
-            navigation.navigate('networkscreen')
+            navigation.navigate('networkscreen');
         }
         else{
             dispatch(hideSpinner());
