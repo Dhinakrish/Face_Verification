@@ -42,7 +42,7 @@ module.exports = {
 
 
     COLOR: {
-        PRIMARY: '#87cefa',
+        PRIMARY: '#7770ec',
         SECONDARY: '#708090',
         BLACK: '#000000',
         WHITE: '#ffffff'

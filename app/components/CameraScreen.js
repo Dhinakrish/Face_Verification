@@ -1,44 +1,43 @@
-import React, {useEffect, useRef, useState} from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, Image, BackHandler } from "react-native";
-import { ActivityIndicator, Button, IconButton, Modal } from "react-native-paper";
+import React,  {useEffect, useRef, useState} from "react";
+import { View, Text, StyleSheet, Image } from "react-native";
+import { ActivityIndicator, Button, Modal } from "react-native-paper";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { Camera, useCameraDevice } from "react-native-vision-camera";
 import { useBackHandler } from "@react-native-community/hooks";
 import { useDispatch, useSelector } from "react-redux";
-import { hideCameraLoading, showCameraLoading, verifyFace } from "../redux/actions/CameraAction";
-import { qrCode } from "../redux/reducers/QRScreenReducer";
-import { CameraLoading, imagePathValue } from "../redux/reducers/CameraScreenReducer";
-import { store } from "../redux/store";
+import { verifyFace } from "../redux/actions/CameraAction";
 import { updateQRValue } from "../redux/actions/QRScreenAction";
 import Constants from '../util/Constants'
-import RNFS, { moveFile } from 'react-native-fs';
-import RotatePhoto from "react-native-rotate-photo";
+import { RNCamera } from "react-native-camera";
+import { qrCode } from "../redux/reducers/QRScreenReducer";
 
 
 const CameraScreen = ({navigation}) => {
-
-    const [cameraDevices, setCameraDevices] = useState('front');
-    const [rotateCamera, setRotateCamera] = useState(false);
     const [isImageCaptured, setIsImageCaptured] = useState(false);
-    const [imagePath, setImagePath] = useState('');
     const [responseMessage, setResponseMessage] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [showSuccessModal, setSuccessModal] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [count, setCount] = useState(0);
+    const [isDetecting, setIsDetecting] = useState(false);
+
+    const QRCode = useSelector(qrCode);
+
+    let counts = 6
+    useEffect(() => {
+        const updateCount = setInterval(() => {
+            counts = counts - 1;
+            setCount(counts);
+            if (counts === 0){
+                setIsDetecting(true);
+                clearInterval(updateCount)
+            }
+        }, 1000);
+        return () => clearInterval(updateCount);
+    }, []);
 
     const dispatch = useDispatch();
 
-    const QRCode = useSelector(qrCode);
-    const ImagePath = useSelector(imagePathValue)
-    const cameraLoading = useSelector(CameraLoading);
-
     const {COLOR, FONT} = Constants;
-
-    const cameraDevice = useCameraDevice(cameraDevices, {
-        physicalDevices: [
-            'wide-angle-camera'
-        ]
-    });
     const camera = useRef();
 
     useBackHandler(() => {
@@ -49,97 +48,47 @@ const CameraScreen = ({navigation}) => {
 
 
     const captureImage = async () => {
-        // dispatch(showCameraLoading());
-        const photo = await camera.current?.takePhoto({
-            flash:'off',
-            qualityPrioritization: 'speed',
-            enableShutterSound: false,
-        });
-        console.log('Initial_Photo', photo);
-        if (photo != null){
-            if (photo.orientation == 'landscape-right'){
-                RotatePhoto.createRotatedPhoto(photo.path, wp('100%'), hp('100%'), 'PNG', 100, 90, RNFS.TemporaryDirectoryPath, false)
-            .then(response => {
-                dispatch(hideCameraLoading());
-                console.log('rotatedPhoto', response);
-                setImagePath(response.uri);
-                setIsImageCaptured(true);
-            })
-            .catch(err => {
-                dispatch(hideCameraLoading());
-                console.log('err', err)
-            })
-            }
-            else{
-                const photoPath = photo.path.split('/');
-                const filename = photoPath[photoPath.length - 1]
-                console.log('filename',filename)
-    
-                const destinationPath = RNFS.TemporaryDirectoryPath + filename;
-    
-                if (await RNFS.exists(destinationPath)){
-                    await RNFS.unlink(destinationPath);
+        const option = {quality: 0.5, base64: true}
+        const image = await camera.current.takePictureAsync(option);
+        console.log('imagedata', image.uri);
+        if (image.uri != ''){
+            setIsImageCaptured(true);
+            setShowModal(true);
+            let data = {qrValue: QRCode, imageValue: image.uri }
+            dispatch(verifyFace(data, (res) => {
+                console.log('Face_Verify_CallBack_res', res);
+                if (res != ''){
+                    if (res.message != ''){
+                        if (res.message == 'Authentication Failure'){
+                            setResponseMessage('Authentication Failed');
+                            setSuccessModal(true);
+                        }
+                        else if (res.message == 'success'){
+                            setResponseMessage('Verified successfully');
+                            setSuccessModal(true);
+                            setSuccess(true)
+                        }
+                        else if (res.message == 'invalid qr code'){
+                            setResponseMessage('Scan valid QR again')
+                            setSuccessModal(true);
+                        }
+                        else {
+                            setResponseMessage('Invalid face, scan again');
+                            setSuccessModal(true);
+                        }
+                    }else{
+                        setResponseMessage('Try after the time')
+                        setSuccessModal(true);
+                    }
                 }
-            
-                await moveFile(photo?.path ?? '', destinationPath);
-    
-                const newPhotoUri = 'file://' + destinationPath;
-    
-                console.log('cachefilename', newPhotoUri);
- 
-            if (newPhotoUri !== null){
-                dispatch(hideCameraLoading());
-                console.log('rotatedPhoto', newPhotoUri);
-                setImagePath(newPhotoUri);
-                setIsImageCaptured(true);
-            }else {
-                dispatch(hideCameraLoading());
-                console.log('Camera picture not taking')
-            }
-            }
-        }
-        else{
-            dispatch(hideCameraLoading());   
-        }
-    };
-
-    const callApi = () => {
-        setShowModal(true);
-        let data = {qrValue: store.getState().qrstate.qrCode, imageValue: imagePath }
-        dispatch(verifyFace(data, (res) => {
-            console.log('Face_Verify_CallBack_res', res);
-            if (res != ''){
-                if (res.message != ''){
-                    if (res.message == 'Authentication Failure'){
-                        console.log('dhiaaa');
-                        setResponseMessage('Authentication Failed');
-                        setSuccessModal(true);
-                    }
-                    else if (res.message == 'success'){
-                        setResponseMessage('Verified successfully');
-                        setSuccessModal(true);
-                        setSuccess(true)
-                    }
-                    else if (res.message == 'invalid qr code'){
-                        setResponseMessage('Scan valid QR again')
-                        setSuccessModal(true);
-                    }
-                    else {
-                        setResponseMessage('Invalid face, scan again');
-                        setSuccessModal(true);
-                    }
-                }else{
-                    setResponseMessage('Try after the time')
+                else{
+                    setResponseMessage('Try after the time');
                     setSuccessModal(true);
                 }
-            }
-            else{
-                setResponseMessage('Try after the time');
-                setSuccessModal(true);
-            }
-        }));
-        
-    }
+            }));
+
+        }
+    };
 
     const renderModal = () => {
         return(
@@ -160,7 +109,7 @@ const CameraScreen = ({navigation}) => {
                     style = {{marginTop: hp('3%')}}
                     />
                     <Text style = {{fontSize: FONT.M, color: COLOR.BLACK, marginTop: hp('3%')}}>
-                        verifing..
+                        verifing...
                     </Text>
                     </View>}
                 {showSuccessModal && <View style = {{alignItems: 'center'}}>
@@ -169,12 +118,10 @@ const CameraScreen = ({navigation}) => {
                         <Button
                         mode="elevated"
                         style = {{marginTop: hp('4%'), backgroundColor: COLOR.PRIMARY}}
-                        textColor="black"
+                        textColor={COLOR.WHITE}
                         labelStyle={{width: wp('20%'), borderColor: 'black'}}
                         onPress={() => {
-                            setImagePath('');
                             setIsImageCaptured(false);
-                            setCameraDevices('front');
                             setSuccessModal(false);
                             setResponseMessage('');
                             setShowModal(false);
@@ -182,7 +129,7 @@ const CameraScreen = ({navigation}) => {
                             navigation.navigate('qrscreen');
                         }}
                         >
-                            {success ? 'Okay' : 'Okay'}
+                            Okay
                         </Button>
                 </View>}
             </Modal>
@@ -190,104 +137,47 @@ const CameraScreen = ({navigation}) => {
     }
 
     return (
-        <View style = {{width: wp('100%'), height: hp('100%')}}>
-        {cameraLoading ? (<View style = {{justifyContent: 'center', backgroundColor: 'black', alignItems: 'center', width: wp('100%'), height: '100%'}}>
-            <ActivityIndicator
-            animating={true}
-            size={wp('10%')}
-            color="white"
-            />
-        </View>) : (<View style = {{width: wp('100%'), height: hp('100%'), flex: 1}}>
-            {!isImageCaptured && <View style = {{flex: 1}}>
-                <Camera
-                ref={camera}
-                device={cameraDevice}
-                photo={true}
-                style = {StyleSheet.absoluteFill}
-                isActive={true}
-                resizeMode="cover"
-                focusable = {true}
-                orientation={'portrait'}
-                zoom={cameraDevice.neutralZoom}
-                />
-                <View style = {{flexDirection: 'row'}}>
-                    <View style = {{width: wp ('10%'), height: wp ('10%'), marginTop: wp('2%'), marginLeft: wp('85%'), marginRight: wp ('2%'), justifyContent: 'center', alignItems: 'center',}}>
-                        <IconButton
-                        icon={require('../assets/rotation.png')}
-                        size={30}
-                        iconColor='white'
-                        onPress={() => {
-                            if (rotateCamera == false){
-                                setCameraDevices('front')
-                                setRotateCamera(true);
+        <View style = {{width: wp('100%'), height: hp('100%'), alignItems: 'center', justifyContent: 'center'}}>
+            <RNCamera
+            ref={camera}
+            style = {{width: wp('100%'), height: hp('100%')}}
+            type="front"
+            focusable={true}
+            onFacesDetected={(face) => {
+                if (isImageCaptured == false && isDetecting == true){
+                    if(face.faces.length != 0){
+                        face.faces.map((item) => {
+                            const leftEyeProb = item.leftEyeOpenProbability;
+                            const rightEyeProb = item.rightEyeOpenProbability;
+                            const nosePosition = item.noseBasePosition.y;
+                            if (leftEyeProb >= 0.80 && rightEyeProb >= 0.80){
+                                if ((nosePosition >= 350) && (nosePosition <= 500)){
+                                    captureImage();
+                                }
+                                else {
+                                    console.log('nose not okay');
+                                }
+                            }else{
+                                console.log('Eye not okay');
                             }
-                            else{
-                                setCameraDevices('back')
-                                setRotateCamera(false);
-                            }
-                        }}
-                        />
-                    </View>
-                </View>
-                <View style = {{width: wp('100%'), height: hp('12%'), marginTop: hp ('75%'), flexDirection: 'row', justifyContent: 'center', alignItems: 'center'}}>
-                    <View style = {{width: wp('33.3%'), height: wp ('23%'), justifyContent: 'center', alignItems: 'center'}}>
-                        <TouchableOpacity style = {{
-                                width: wp ('18%'),
-                                height: wp ('18%'),
-                                backgroundColor: COLOR.WHITE,
-                                borderRadius: wp ('18%'),
-                                borderWidth: 3,
-                                borderColor: COLOR.BLACK
-                            }}
-                            onPress={() => {
-                                captureImage()
-                            }}
-                            >
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>}
-            {isImageCaptured && <View style = {{flex: 1}}>
-                <ImageBackground
-                source={{uri: 'file://' + imagePath}}
-                style = {{width: wp('100%'), height: hp('100%')}}
-                >
-                    <TouchableOpacity 
-                    onPress={() => {
-                        setIsImageCaptured(false);
-                        setImagePath('');
-                        navigation.navigate('camerascreen')
-                    }}
-                    >
-                        <Image
-                        source={require('../assets/close.png')}
-                        style = {{width: wp('4%'), height: wp('4%'), marginTop: wp('3%'), marginLeft: wp('3%')}}
-                        />
-                    </TouchableOpacity>
-                    {showModal && renderModal()}
-                    <View style = {{width: wp('100%'), height: hp('6%'), marginTop: hp ('87%'), alignItems: 'center', flexDirection: 'row', justifyContent: 'flex-start'}}>
-                        <TouchableOpacity style = {{width: wp ('30%'), height: hp('5%'), backgroundColor: COLOR.PRIMARY, borderColor: COLOR.BLACK, borderRadius: 7, borderWidth: 1, marginLeft: wp ('8%')}}
-                        onPress={()=> {
-                            setIsImageCaptured(false);
-                            // dispatch(updateImagePath(''));
-                            setImagePath('');
-                            navigation.navigate('camerascreen')
-                        }}
-                        >
-                            <Text style = {{textAlign: 'center', fontWeight: '700', fontSize: FONT.M, color: COLOR.BLACK, marginTop: 5, fontFamily: 'sans-serif'}}>Retake</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style = {{width: wp ('30%'), height: hp('5%'), backgroundColor: COLOR.PRIMARY, borderColor: COLOR.BLACK, borderWidth: 1, borderRadius: 7, marginLeft: wp ('23.5%')}}
-                        onPress={() => {
-                            callApi();
-                        }}
-                        >
-                            <Text style = {{textAlign: 'center', fontWeight: '700', fontSize: FONT.M, color: 'black', marginTop: 5, fontFamily: 'sans-serif'}}>Okay</Text>
-                        </TouchableOpacity>
-                    </View>
-                </ImageBackground>
+                        })
+                    }
+                }  
+            }}
+            faceDetectionMode={RNCamera.Constants.FaceDetection.Mode.accurate}
+            faceDetectionLandmarks={RNCamera.Constants.FaceDetection.Landmarks.all}
+            faceDetectionClassifications={RNCamera.Constants.FaceDetection.Classifications.all}
+            >
+                {(isDetecting && !isImageCaptured) && <View style = {{width: wp('100%'), height: hp('5%'), justifyContent: 'space-between', alignItems: 'center', flexDirection: 'row', paddingHorizontal: wp('38%')}}>
+                    <Image
+                    source={require('../assets/record.png')}
+                    style={{width: wp('3%'), height: wp('3%')}}
+                    />
+                    <Text style = {{fontSize: FONT.M}}>Detecting</Text>
                 </View>}
-        </View>)}
-        
+                {(!isDetecting && !isImageCaptured) && <Text style = {{fontSize: wp('25%'), textAlign: 'center', marginTop: hp('40%')}}>{count}</Text>}
+            </RNCamera>
+            {showModal && renderModal()}
         </View>
     )
 };

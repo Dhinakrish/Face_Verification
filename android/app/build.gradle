@@ -81,6 +81,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+         missingDimensionStrategy 'react-native-camera', 'mlkit'
     }
     signingConfigs {
         debug {
@@ -108,7 +109,8 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:flipper-integration")
-    implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+    // implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+    implementation project(':react-native-camera')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

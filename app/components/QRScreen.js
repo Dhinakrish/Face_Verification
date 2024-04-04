@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {View, Text, PermissionsAndroid, StyleSheet, Image, BackHandler, Alert, Platform, Linking, TouchableOpacity, ImageBackgroundBase, ImageBackground} from 'react-native';
-import { Appbar, Modal, Button, ActivityIndicator } from "react-native-paper";
+import { Appbar, Modal, Button, ActivityIndicator, Icon } from "react-native-paper";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { Camera, useCameraDevice, useCodeScanner } from "react-native-vision-camera";
 import DeviceInfo from "react-native-device-info";
 import IntentLauncher from '@suxueweibo/react-native-intent-launcher';
 import BarcodeMask from "react-native-barcode-mask";
@@ -12,11 +11,12 @@ import { hideQRLoading, showQRLoading, updatePermissionStatus, updateQRValue } f
 import { QRLoading } from "../redux/reducers/QRScreenReducer";
 import Constants from '../util/Constants';
 import { permissionGranted } from "../redux/reducers/DeviceReducer";
+import { RNCamera } from "react-native-camera";
+import { SliderBox } from 'react-native-image-slider-box';
 
 const QRScreen = ({navigation}) => {
 
     const packageName = DeviceInfo.getBundleId();
-
     const [isCameraActivate, setIsCameraActivate] = useState(false);
     const [showModel, setShowModel] = useState(false);
     const [gotCameraPermission, setGotCameraPermission] = useState(false);
@@ -31,11 +31,11 @@ const QRScreen = ({navigation}) => {
     }, []);
 
     const checkCameraPermission = async () => {
-        const result = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.CAMERA
+        const result = await PermissionsAndroid.requestMultiple(
+            [PermissionsAndroid.PERMISSIONS.CAMERA, PermissionsAndroid.PERMISSIONS.RECORD_AUDIO]
         );
 
-        if (result === PermissionsAndroid.RESULTS.GRANTED){
+        if (result["android.permission.CAMERA"] === PermissionsAndroid.RESULTS.GRANTED && result["android.permission.RECORD_AUDIO"] === PermissionsAndroid.RESULTS.GRANTED){
             setGotCameraPermission(true);
             dispatch(updatePermissionStatus(true));
         }
@@ -46,40 +46,26 @@ const QRScreen = ({navigation}) => {
         }
     };
 
-    const device = useCameraDevice('back', {
-        physicalDevices: [
-            'wide-angle-camera',
-        ],
-    });
-
-    const codeScanner = useCodeScanner({
-        codeTypes: ['qr', 'ean-13'],
-        onCodeScanned: (code) => {
-            console.log('QR_Code', code);
-            code.map(item => {
-                dispatch(updateQRValue(item.value));
-            })
-            setIsCameraActivate(false);
-            setShowModel(true);
+    const handleBackHandler = () => {
+        Alert.alert('Warning', 'Are you sure you want to exit the app.', [{
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {}
+        },
+        {
+            text: 'Ok',
+            style: 'default',
+            onPress: () => {
+                BackHandler.exitApp();
+            }
         }
-    });
+    ])
+    }
 
     useFocusEffect(
         React.useCallback(() => {
             const onBackPress = () => {
-                Alert.alert('Warning', 'Are you sure you want to exit the app.', [{
-                    text: 'Cancel',
-                    style: 'cancel',
-                    onPress: () => {}
-                },
-                {
-                    text: 'Ok',
-                    style: 'default',
-                    onPress: () => {
-                        BackHandler.exitApp();
-                    }
-                }
-            ])
+            handleBackHandler()
             return true
             };
 
@@ -89,6 +75,12 @@ const QRScreen = ({navigation}) => {
             }
         }, []),
     );
+
+    const sliderImages = [
+        require('../assets/qr-code-icon-with-phone-vector.jpg'),
+        require('../assets/facial-recognition-system-3985539-3356791.png'),
+        require('../assets/1646290228947.png')
+    ]
 
     const renderModal = () => {
         dispatch(hideQRLoading());
@@ -104,6 +96,7 @@ const QRScreen = ({navigation}) => {
                     <Text style= {{fontSize: FONT.M, color: COLOR.BLACK, marginTop: wp('1%')}}>Successfully</Text>
                     <Button
                     mode="contained-tonal"
+                    textColor={COLOR.WHITE}
                     style = {{marginTop: hp('3%'), backgroundColor: COLOR.PRIMARY}}
                     onPress={() => {
                         setShowModel(false);
@@ -132,6 +125,7 @@ const QRScreen = ({navigation}) => {
                     <Button
                     mode="contained-tonal"
                     style = {{marginTop: hp('3%'), backgroundColor: COLOR.PRIMARY}}
+                    textColor={COLOR.WHITE}
                     onPress={() => {
                         if (Platform.OS === 'ios'){
                             Linking.openURL('app-settings:');
@@ -153,14 +147,16 @@ const QRScreen = ({navigation}) => {
         dispatch(hideQRLoading());
         return (
             <View>
-                <Camera
-                device={device}
-                style = {{width: wp ('70%'), height: wp ('70%')}}
-                codeScanner={codeScanner}
-                isActive={isCameraActivate ? true : false}
-                focusable = {true}
-                resizeMode="cover"
-                zoom={device.neutralZoom}
+                <RNCamera
+                style = {{flex: 1, width: wp('100%'), height: hp('97%')}}
+                type="back"
+                focusable={true}
+                onBarCodeRead={(data) => {
+                    console.log('QR_Code', data.data);
+                    dispatch(updateQRValue(data.data));
+                    setIsCameraActivate(false);
+                    setShowModel(true);
+                }}
                 />
                 <BarcodeMask
                 width={wp('70%')}
@@ -176,26 +172,34 @@ const QRScreen = ({navigation}) => {
     }
 
     return(
-        <View style = {{width: wp('100%'), height: hp('100%'), alignItems: 'center', backgroundColor: 'lightgrey'}}>
-            <ImageBackground
-            source={require('../assets/login-bg.png')}
-            style={{width: wp('100%'), height: hp('100%'), alignItems: 'center'}}
-            >
-                <Appbar.Header style  = {{width: wp('100%'), height: hp('7%'), backgroundColor: COLOR.PRIMARY}}>
-                <Appbar.Content  titleStyle= {{fontWeight: '700', fontSize: FONT.L}} title = 'QR Screen'/>
+        <View style = {{width: wp('100%'), height: hp('100%'), alignItems: 'center', backgroundColor: 'white'}}>
+            <Appbar.Header style = {{width: wp('100%'), height: hp('7%'), backgroundColor: COLOR.PRIMARY}}>
+            <Appbar.Content  titleStyle= {{fontWeight: '700', fontSize: FONT.L, color: COLOR.WHITE}} title = 'QR Screen'/>
+            <Appbar.Action icon={require('../assets/logout.png')} iconColor={COLOR.WHITE} onPress={() => handleBackHandler()}/>
             </Appbar.Header>
-            <View style = {{width: wp ('100%'), height: hp('5%'), marginTop: hp ('10%'), justifyContent: 'center', alignItems: 'center'}}>
-                <Text style = {{fontSize: FONT.L, fontWeight: '400', color: COLOR.BLACK}}>
-                    Scan QR Code
-                </Text>
-            </View>
-            <View style = {styleProps.qrContainer}>
+            <View style = {{width: wp('100%'), height: hp ('93%'), position: "relative", justifyContent: 'center', alignItems: 'center', alignSelf: 'center',}}>
                 {QrLoading && <ActivityIndicator
                 animating={QrLoading}
                 color="lightgrey"
                 size={wp('10%')}
                 />}
-                {!isCameraActivate && <TouchableOpacity style = {{width: wp ('40%'), height: hp('6%'), backgroundColor: COLOR.PRIMARY, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}
+                {!isCameraActivate && 
+                <View style = {styleProps.qrContainer}>
+                <View style = {{width: wp('80%'), height: hp('30%'), marginTop: hp('15%'), alignItems: 'center', justifyContent: 'center'}}>
+                    <SliderBox
+                    images = {sliderImages}
+                    disableOnPress={false}
+                    sliderBoxHeight={hp('30%')}
+                    parentWidth={wp('85%')}
+                    dotColor={COLOR.PRIMARY}
+                    inactiveDotColor={COLOR.WHITE}
+                    autoplay={true}
+                    autoplayInterval={2000}
+                    circleLoop
+                    imageLoadingColor={COLOR.WHITE}
+                    />
+                </View>
+                <TouchableOpacity style = {{width: wp ('40%'), height: hp('6%'), backgroundColor: COLOR.PRIMARY, borderRadius: 10, justifyContent: 'space-between', alignItems: 'center', marginTop: hp('15%'), flexDirection: 'row', paddingHorizontal: wp('5%')}}
                 onPress={() => {
                     dispatch(showQRLoading());
                     if (PermissionGranted === false){
@@ -205,13 +209,17 @@ const QRScreen = ({navigation}) => {
                     }
                 }}
                 >
-                    <Text style = {{fontSize: FONT.M, fontWeight: '500', color: COLOR.BLACK}}>Tap to scan</Text>
-                </TouchableOpacity>}
+                    <Text style = {{fontSize: FONT.M, fontWeight: '500', color: COLOR.WHITE, marginRight: hp('2%')}}>Tap to scan</Text>
+                    <Icon 
+                    source={require('../assets/qr-code.png')}
+                    size={wp('5%')}
+                    />
+                </TouchableOpacity>
+                </View>}
                 {isCameraActivate && renderQRView()}
                 {!PermissionGranted && renderPermissionModel()}
                 {showModel && renderModal()}
             </View>
-            </ImageBackground>
         </View>
     )
 }
@@ -219,19 +227,11 @@ const QRScreen = ({navigation}) => {
 const styleProps = StyleSheet.create({
     
     qrContainer: {
-        width: wp('70%'), height: wp ('70%'),
-        marginTop: hp('5%'), 
+        width: wp('100%'), height: hp ('93%'),
         position: "relative",
-        backgroundColor: 'white',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         alignItems: 'center',
-        borderRadius: 20,
-        borderColor: 'grey',
-        borderWidth: 0.5,
-        shadowColor: '#DDD',
-        shadowOpacity: 10,
-        shadowRadius: 3,
-        alignSelf: 'center'
+        alignSelf: 'center',
     },
 
 
@@ -248,6 +248,8 @@ const styleProps = StyleSheet.create({
         shadowColor: 'grey',
         shadowOpacity: 10,
         justifyContent: 'flex-start',
+        marginLeft: wp('20%'),
+        marginBottom: hp('20%')
     },
 })
 
